@@ -61,7 +61,7 @@ static redisReplyObjectFunctions defaultFunctions = {
 
 /* Create a reply object */
 static redisReply *createReplyObject(int type) {
-    redisReply *r = calloc(1,sizeof(*r));
+    redisReply *r = (redisReply*)calloc(1,sizeof(*r));
 
     if (r == NULL)
         return NULL;
@@ -72,7 +72,7 @@ static redisReply *createReplyObject(int type) {
 
 /* Free a reply object */
 void freeReplyObject(void *reply) {
-    redisReply *r = reply;
+    redisReply *r = (redisReply*)reply;
     size_t j;
 
     if (r == NULL)
@@ -107,7 +107,7 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     if (r == NULL)
         return NULL;
 
-    buf = malloc(len+1);
+    buf = (char*)malloc(len+1);
     if (buf == NULL) {
         freeReplyObject(r);
         return NULL;
@@ -124,7 +124,7 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     r->len = len;
 
     if (task->parent) {
-        parent = task->parent->obj;
+        parent = (redisReply*)task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
         parent->element[task->idx] = r;
     }
@@ -139,7 +139,7 @@ static void *createArrayObject(const redisReadTask *task, int elements) {
         return NULL;
 
     if (elements > 0) {
-        r->element = calloc(elements,sizeof(redisReply*));
+        r->element = (redisReply**)calloc(elements,sizeof(redisReply*));
         if (r->element == NULL) {
             freeReplyObject(r);
             return NULL;
@@ -149,7 +149,7 @@ static void *createArrayObject(const redisReadTask *task, int elements) {
     r->elements = elements;
 
     if (task->parent) {
-        parent = task->parent->obj;
+        parent = (redisReply*)task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
         parent->element[task->idx] = r;
     }
@@ -166,7 +166,7 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
     r->integer = value;
 
     if (task->parent) {
-        parent = task->parent->obj;
+        parent = (redisReply*)task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
         parent->element[task->idx] = r;
     }
@@ -181,7 +181,7 @@ static void *createNilObject(const redisReadTask *task) {
         return NULL;
 
     if (task->parent) {
-        parent = task->parent->obj;
+        parent = (redisReply*)task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
         parent->element[task->idx] = r;
     }
@@ -232,7 +232,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
         if (*c != '%' || c[1] == '\0') {
             if (*c == ' ') {
                 if (touched) {
-                    newargv = realloc(curargv,sizeof(char*)*(argc+1));
+                    newargv = (char **)realloc(curargv,sizeof(char*)*(argc+1));
                     if (newargv == NULL) goto memory_err;
                     curargv = newargv;
                     curargv[argc++] = curarg;
@@ -381,7 +381,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     /* Add the last argument if needed */
     if (touched) {
-        newargv = realloc(curargv,sizeof(char*)*(argc+1));
+        newargv = (char **)realloc(curargv,sizeof(char*)*(argc+1));
         if (newargv == NULL) goto memory_err;
         curargv = newargv;
         curargv[argc++] = curarg;
@@ -397,7 +397,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     totlen += 1+countDigits(argc)+2;
 
     /* Build the command at protocol level */
-    cmd = malloc(totlen+1);
+    cmd = (char *)malloc(totlen+1);
     if (cmd == NULL) goto memory_err;
 
     pos = sprintf(cmd,"*%d\r\n",argc);
@@ -507,7 +507,7 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
     cmd = sdscatfmt(cmd, "*%i\r\n", argc);
     for (j=0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
-        cmd = sdscatfmt(cmd, "$%T\r\n", len);
+        cmd = sdscatfmt(cmd, "$%u\r\n", len);
         cmd = sdscatlen(cmd, argv[j], len);
         cmd = sdscatlen(cmd, "\r\n", sizeof("\r\n")-1);
     }
@@ -545,7 +545,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     }
 
     /* Build the command at protocol level */
-    cmd = malloc(totlen+1);
+    cmd = (char *)malloc(totlen+1);
     if (cmd == NULL)
         return -1;
 
@@ -592,7 +592,7 @@ redisReader *redisReaderCreate(void) {
 static redisContext *redisContextInit(void) {
     redisContext *c;
 
-    c = calloc(1,sizeof(redisContext));
+    c = (redisContext*)calloc(1,sizeof(redisContext));
     if (c == NULL)
         return NULL;
 
@@ -710,6 +710,8 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
 redisContext *redisConnectBindNonBlock(const char *ip, int port,
                                        const char *source_addr) {
     redisContext *c = redisContextInit();
+    if (c == NULL)
+        return NULL;
     c->flags &= ~REDIS_BLOCK;
     redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
     return c;
@@ -718,6 +720,8 @@ redisContext *redisConnectBindNonBlock(const char *ip, int port,
 redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
                                                 const char *source_addr) {
     redisContext *c = redisContextInit();
+    if (c == NULL)
+        return NULL;
     c->flags &= ~REDIS_BLOCK;
     c->flags |= REDIS_REUSEADDR;
     redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
@@ -822,10 +826,10 @@ int redisBufferRead(redisContext *c) {
 /* Write the output buffer to the socket.
  *
  * Returns REDIS_OK when the buffer is empty, or (a part of) the buffer was
- * succesfully written to the socket. When the buffer is empty after the
+ * successfully written to the socket. When the buffer is empty after the
  * write operation, "done" is set to 1 (if given).
  *
- * Returns REDIS_ERR if an error occured trying to write and sets
+ * Returns REDIS_ERR if an error occurred trying to write and sets
  * c->errstr to hold the appropriate error string.
  */
 int redisBufferWrite(redisContext *c, int *done) {
@@ -984,7 +988,7 @@ int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const s
  * context is non-blocking, the "reply" pointer will not be used and the
  * command is simply appended to the write buffer.
  *
- * Returns the reply when a reply was succesfully retrieved. Returns NULL
+ * Returns the reply when a reply was successfully retrieved. Returns NULL
  * otherwise. When NULL is returned in a blocking context, the error field
  * in the context will be set.
  */
@@ -1007,9 +1011,8 @@ void *redisvCommand(redisContext *c, const char *format, va_list ap) {
 
 void *redisCommand(redisContext *c, const char *format, ...) {
     va_list ap;
-    void *reply = NULL;
     va_start(ap,format);
-    reply = redisvCommand(c,format,ap);
+    void *reply = redisvCommand(c,format,ap);
     va_end(ap);
     return reply;
 }

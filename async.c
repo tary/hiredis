@@ -68,7 +68,7 @@ static unsigned int callbackHash(const void *key) {
 
 static void *callbackValDup(void *privdata, const void *src) {
     ((void) privdata);
-    redisCallback *dup = malloc(sizeof(*dup));
+    redisCallback *dup = (redisCallback*)malloc(sizeof(*dup));
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }
@@ -105,7 +105,7 @@ static dictType callbackDict = {
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac;
 
-    ac = realloc(c,sizeof(redisAsyncContext));
+    ac = (redisAsyncContext*)realloc(c,sizeof(redisAsyncContext));
     if (ac == NULL)
         return NULL;
 
@@ -228,7 +228,7 @@ static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
     redisCallback *cb;
 
     /* Copy callback from stack to heap */
-    cb = malloc(sizeof(*cb));
+    cb = (redisCallback*)malloc(sizeof(*cb));
     if (cb == NULL)
         return REDIS_ERR_OOM;
 
@@ -289,13 +289,13 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     /* Run subscription callbacks callbacks with NULL reply */
     it = dictGetIterator(ac->sub.channels);
     while ((de = dictNext(it)) != NULL)
-        __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+        __redisRunCallback(ac,(redisCallback*)dictGetEntryVal(de),NULL);
     dictReleaseIterator(it);
     dictRelease(ac->sub.channels);
 
     it = dictGetIterator(ac->sub.patterns);
     while ((de = dictNext(it)) != NULL)
-        __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+        __redisRunCallback(ac,(redisCallback*)dictGetEntryVal(de),NULL);
     dictReleaseIterator(it);
     dictRelease(ac->sub.patterns);
 
@@ -336,7 +336,8 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
 
     if (ac->err == 0) {
         /* For clean disconnects, there should be no pending callbacks. */
-        assert(__redisShiftCallback(&ac->replies,NULL) == REDIS_ERR);
+        int ret = __redisShiftCallback(&ac->replies,NULL);
+        assert(ret == REDIS_ERR);
     } else {
         /* Disconnection is caused by an error, make sure that pending
          * callbacks cannot call new commands. */
@@ -462,11 +463,11 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
             /* No more regular callbacks and no errors, the context *must* be subscribed or monitoring. */
             assert((c->flags & REDIS_SUBSCRIBED || c->flags & REDIS_MONITORING));
             if(c->flags & REDIS_SUBSCRIBED)
-                __redisGetSubscribeCallback(ac,reply,&cb);
+                __redisGetSubscribeCallback(ac,(redisReply*)reply,&cb);
         }
 
         if (cb.fn != NULL) {
-            __redisRunCallback(ac,&cb,reply);
+            __redisRunCallback(ac,&cb,(redisReply*)reply);
             c->reader->fn->freeObject(reply);
 
             /* Proceed with free'ing when redisAsyncFree() was called. */
@@ -489,7 +490,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 }
 
 /* Internal helper function to detect socket status the first time a read or
- * write event fires. When connecting was not succesful, the connect callback
+ * write event fires. When connecting was not successful, the connect callback
  * is called with a REDIS_ERR status and the context is free'd. */
 static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
@@ -676,6 +677,8 @@ int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *priv
     int len;
     int status;
     len = redisFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
+    if (len < 0)
+        return REDIS_ERR;
     status = __redisAsyncCommand(ac,fn,privdata,cmd,len);
     sdsfree(cmd);
     return status;
