@@ -68,7 +68,7 @@ static unsigned int callbackHash(const void *key) {
 
 static void *callbackValDup(void *privdata, const void *src) {
     ((void) privdata);
-    redisCallback *dup = malloc(sizeof(*dup));
+    redisCallback *dup = (redisCallback*)malloc(sizeof(*dup));
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }
@@ -105,7 +105,7 @@ static dictType callbackDict = {
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac;
 
-    ac = realloc(c,sizeof(redisAsyncContext));
+    ac = (redisAsyncContext*)realloc(c,sizeof(redisAsyncContext));
     if (ac == NULL)
         return NULL;
 
@@ -228,7 +228,7 @@ static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
     redisCallback *cb;
 
     /* Copy callback from stack to heap */
-    cb = malloc(sizeof(*cb));
+    cb = (redisCallback*)malloc(sizeof(*cb));
     if (cb == NULL)
         return REDIS_ERR_OOM;
 
@@ -289,13 +289,13 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     /* Run subscription callbacks callbacks with NULL reply */
     it = dictGetIterator(ac->sub.channels);
     while ((de = dictNext(it)) != NULL)
-        __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+        __redisRunCallback(ac,(redisCallback *)dictGetEntryVal(de),NULL);
     dictReleaseIterator(it);
     dictRelease(ac->sub.channels);
 
     it = dictGetIterator(ac->sub.patterns);
     while ((de = dictNext(it)) != NULL)
-        __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+        __redisRunCallback(ac,(redisCallback *)dictGetEntryVal(de),NULL);
     dictReleaseIterator(it);
     dictRelease(ac->sub.patterns);
 
@@ -389,7 +389,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
         sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len);
         de = dictFind(callbacks,sname);
         if (de != NULL) {
-            cb = dictGetEntryVal(de);
+            cb = (redisCallback *)dictGetEntryVal(de);
 
             /* If this is an subscribe reply decrease pending counter. */
             if (strcasecmp(stype+pvariant,"subscribe") == 0) {
@@ -476,11 +476,11 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
             /* No more regular callbacks and no errors, the context *must* be subscribed or monitoring. */
             assert((c->flags & REDIS_SUBSCRIBED || c->flags & REDIS_MONITORING));
             if(c->flags & REDIS_SUBSCRIBED)
-                __redisGetSubscribeCallback(ac,reply,&cb);
+                __redisGetSubscribeCallback(ac,(redisReply*)reply,&cb);
         }
 
         if (cb.fn != NULL) {
-            __redisRunCallback(ac,&cb,reply);
+            __redisRunCallback(ac,&cb,(redisReply*)reply);
             c->reader->fn->freeObject(reply);
 
             /* Proceed with free'ing when redisAsyncFree() was called. */
@@ -637,7 +637,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
             de = dictFind(cbdict,sname);
 
             if (de != NULL) {
-                existcb = dictGetEntryVal(de);
+                existcb = (redisCallback *)dictGetEntryVal(de);
                 cb.pending_subs = existcb->pending_subs + 1;
             }
 

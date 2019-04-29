@@ -9,4 +9,9 @@
 #define _DARWIN_C_SOURCE
 #endif
 
+#ifndef AIX
+# define _XOPEN_SOURCE_EXTENDED 1
+# define _ALL_SOURCE
+#endif
+
 #endif

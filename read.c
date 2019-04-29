@@ -490,7 +490,7 @@ static int processItem(redisReader *r) {
 redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     redisReader *r;
 
-    r = calloc(1,sizeof(redisReader));
+    r = (redisReader*)calloc(1,sizeof(redisReader));
     if (r == NULL)
         return NULL;
 

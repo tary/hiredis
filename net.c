@@ -293,7 +293,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     if (timeout) {
         if (c->timeout != timeout) {
             if (c->timeout == NULL)
-                c->timeout = malloc(sizeof(struct timeval));
+                c->timeout = (struct timeval*)malloc(sizeof(struct timeval));
 
             memcpy(c->timeout, timeout, sizeof(struct timeval));
         }
@@ -445,7 +445,7 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
     if (timeout) {
         if (c->timeout != timeout) {
             if (c->timeout == NULL)
-                c->timeout = malloc(sizeof(struct timeval));
+                c->timeout = (struct timeval*)malloc(sizeof(struct timeval));
 
             memcpy(c->timeout, timeout, sizeof(struct timeval));
         }
