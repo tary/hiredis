@@ -38,8 +38,8 @@ call:COMPILE_TO_OBJECT "dict.c" "%TEMP_PATH%/dict.c.o"
 call:COMPILE_TO_OBJECT "async.c" "%TEMP_PATH%/async.c.o"
 call:COMPILE_TO_OBJECT "sds.c" "%TEMP_PATH%/sds.c.o"
 
-%CLANG_BIN%\x86_64-unknown-linux-gnu-ar.exe rc "%LIB_OUTPUT_PATH%/hiredis.a" @"%RESPONSE_FILE%"
-%CLANG_BIN%\x86_64-unknown-linux-gnu-ranlib.exe "%LIB_OUTPUT_PATH%/hiredis.a"
+%CLANG_BIN%\x86_64-unknown-linux-gnu-ar.exe rc "%LIB_OUTPUT_PATH%/lhiredis.a" @"%RESPONSE_FILE%"
+%CLANG_BIN%\x86_64-unknown-linux-gnu-ranlib.exe "%LIB_OUTPUT_PATH%/lhiredis.a"
 
 
 pause
